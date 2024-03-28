@@ -1,15 +1,20 @@
 module github.com/Kaese72/asset-registry
 
-go 1.19
+go 1.22
+
+toolchain go1.22.0
 
 require github.com/spf13/viper v1.18.2
+
+require github.com/Kaese72/finding-registry v0.0.5
+
+require github.com/rabbitmq/amqp091-go v1.9.0
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/georgysavva/scany/v2 v2.1.0
 	github.com/go-sql-driver/mysql v1.7.1
-	github.com/google/uuid v1.5.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -29,4 +34,5 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+
 )

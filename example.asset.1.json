@@ -1,0 +1,7 @@
+{
+    "name": "new example",
+    "reportScopes": [{
+        "type": "ipv4",
+        "value": "192.168.101.2"
+    }]
+}

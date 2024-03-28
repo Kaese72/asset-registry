@@ -13,18 +13,22 @@ import (
 	"strings"
 
 	"github.com/Kaese72/asset-registry/apierrors"
+	"github.com/Kaese72/asset-registry/internal/application"
 	"github.com/Kaese72/asset-registry/internal/database"
 
 	registryModels "github.com/Kaese72/asset-registry/registry/models"
+	findingRegistryModels "github.com/Kaese72/finding-registry/event"
 	"github.com/dgrijalva/jwt-go"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type application struct {
-	db        *sql.DB
-	jwtSecret string
+type webApplication struct {
+	application application.Application
+	jwtSecret   string
 }
 
 func terminalHTTPError(w http.ResponseWriter, err error) {
@@ -68,8 +72,8 @@ func parseQueryFilters(r *http.Request) []database.Filter {
 	return filters
 }
 
-func (app application) readAssets(w http.ResponseWriter, r *http.Request) {
-	assets, err := database.DBReadRegistryAssets(app.db, parseQueryFilters(r))
+func (app webApplication) readAssets(w http.ResponseWriter, r *http.Request) {
+	assets, err := app.application.ReadAssets(r.Context(), parseQueryFilters(r))
 	if err != nil {
 		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
 		return
@@ -85,14 +89,34 @@ func (app application) readAssets(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app application) createAsset(w http.ResponseWriter, r *http.Request) {
+func (app webApplication) readAsset(w http.ResponseWriter, r *http.Request) {
+	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
+	asset, err := app.application.ReadAsset(r.Context(), id, organizationId)
+	if err != nil {
+		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		return
+	}
+
+	// Write JSON response
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "   ")
+	if err := encoder.Encode(asset); err != nil {
+		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		return
+	}
+}
+
+func (app webApplication) createAsset(w http.ResponseWriter, r *http.Request) {
 	organizationId := r.Context().Value(organizationIDKey).(float64)
 	inputAsset := registryModels.Asset{}
 	if err := json.NewDecoder(r.Body).Decode(&inputAsset); err != nil {
 		terminalHTTPError(w, fmt.Errorf("error decoding request: %s", err.Error()))
 		return
 	}
-	asset, err := database.DBInsertRegistryAsset(app.db, inputAsset, int(organizationId))
+	asset, err := app.application.CreateAsset(r.Context(), inputAsset, int(organizationId))
 	if err != nil {
 		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
 		return
@@ -108,7 +132,7 @@ func (app application) createAsset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app application) updateAsset(w http.ResponseWriter, r *http.Request) {
+func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
 	organizationId := int(r.Context().Value(organizationIDKey).(float64))
 	inputAsset := registryModels.Asset{}
 	if err := json.NewDecoder(r.Body).Decode(&inputAsset); err != nil {
@@ -118,7 +142,7 @@ func (app application) updateAsset(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
-	asset, err := database.DBUpdateRegistryAsset(app.db, inputAsset, id, organizationId)
+	asset, err := app.application.UpdateAsset(r.Context(), inputAsset, id, organizationId)
 	if err != nil {
 		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
 		return
@@ -134,11 +158,39 @@ func (app application) updateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app application) deleteAsset(w http.ResponseWriter, r *http.Request) {
+func (app webApplication) deleteAsset(w http.ResponseWriter, r *http.Request) {
 	organizationId := int(r.Context().Value(organizationIDKey).(float64))
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
-	err := database.DBDeleteRegistryAsset(app.db, id, organizationId)
+	err := app.application.DeleteAsset(r.Context(), id, organizationId)
+	if err != nil {
+		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		return
+	}
+}
+
+func (app webApplication) readReportScopes(w http.ResponseWriter, r *http.Request) {
+	scopes, err := app.application.ReadReportScopes(r.Context(), parseQueryFilters(r))
+	if err != nil {
+		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		return
+	}
+
+	// Write JSON response
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "   ")
+	if err := encoder.Encode(scopes); err != nil {
+		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		return
+	}
+}
+
+func (app webApplication) deleteReportScope(w http.ResponseWriter, r *http.Request) {
+	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
+	err := app.application.DeleteReportScope(r.Context(), id, organizationId)
 	if err != nil {
 		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
 		return
@@ -152,7 +204,7 @@ const (
 	organizationIDKey contextKey = "organizationID"
 )
 
-func (app application) authMiddleware(next http.Handler) http.Handler {
+func (app webApplication) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString := r.Header.Get("Authorization")
 		if tokenString == "" {
@@ -202,6 +254,69 @@ func (app application) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func startFindingUpdateListener(ctx context.Context, app application.Application, connectionString string, queueName string) error {
+	// Plagiarized from https://www.rabbitmq.com/tutorials/tutorial-one-go
+	connection, err := amqp.Dial(connectionString)
+	if err != nil {
+		return err
+	}
+	// defer conn.Close()
+	channel, err := connection.Channel()
+	if err != nil {
+		return err
+	}
+	queue, err := channel.QueueDeclare(
+		queueName, // name
+		false,     // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
+	)
+	if err != nil {
+		return err
+	}
+	msgs, err := channel.Consume(
+		queue.Name, // queue
+		"",         // consumer
+		true,       // auto-ack
+		false,      // exclusive
+		false,      // no-local
+		false,      // no-wait
+		nil,        // args
+	)
+	if err != nil {
+		return err
+	}
+	go func() {
+		defer connection.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-msgs:
+				var findingUpdate findingRegistryModels.FindingUpdate
+				err := json.Unmarshal(msg.Body, &findingUpdate)
+				if err != nil {
+					log.Printf("error parsing message: %s", err.Error())
+					continue
+				}
+				_, err = app.PutReportScope(registryModels.ReportScope{
+					Type:  findingUpdate.ReportLocator.Type,
+					Value: findingUpdate.ReportLocator.Value,
+				},
+					findingUpdate.OrganizationId,
+				)
+				if err != nil {
+					log.Printf("Error while PUTting discovered scope: %s", err.Error())
+					continue
+				}
+			}
+		}
+	}()
+	return nil
+}
+
 type Config struct {
 	Database struct {
 		Host     string `mapstructure:"host"`
@@ -217,6 +332,10 @@ type Config struct {
 		Host string `mapstructure:"host"`
 		Port int    `mapstructure:"port"`
 	} `mapstructure:"listen"`
+	Event struct {
+		FindingUpdates   string `mapstructure:"findingUpdates"`
+		ConnectionString string `mapstructure:"connectionString"`
+	} `mapstructure:"event"`
 }
 
 var Loaded Config
@@ -241,6 +360,11 @@ func init() {
 	viper.BindEnv("listen.port")
 	viper.SetDefault("listen.port", "8080")
 
+	// Event configuration
+	viper.BindEnv("event.findingUpdates")
+	viper.SetDefault("event.findingUpdates", "findingUpdates")
+	viper.BindEnv("event.connectionString")
+
 	err := viper.Unmarshal(&Loaded)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -261,6 +385,10 @@ func init() {
 	if Loaded.JWT.Secret == "" {
 		log.Fatal("JWT secret key not set")
 	}
+
+	if Loaded.Event.ConnectionString == "" {
+		log.Fatal("Event connection string not set")
+	}
 }
 
 func main() {
@@ -270,18 +398,28 @@ func main() {
 	}
 	defer db.Close()
 
-	app := application{
-		db:        db,
-		jwtSecret: Loaded.JWT.Secret,
+	application := application.NewApplication(db)
+
+	webapp := webApplication{
+		application: application,
+		jwtSecret:   Loaded.JWT.Secret,
 	}
 
 	router := mux.NewRouter()
-	autenticatedRouter := router.PathPrefix("/").Subrouter()
-	autenticatedRouter.Use(app.authMiddleware)
+	router.Use(webapp.authMiddleware)
 
-	router.HandleFunc("/assets", app.readAssets).Methods("GET")
-	autenticatedRouter.HandleFunc("/assets", app.createAsset).Methods("POST")
-	autenticatedRouter.HandleFunc("/assets/{id:[0-9]+}", app.updateAsset).Methods("POST")
-	autenticatedRouter.HandleFunc("/assets/{id:[0-9]+}", app.deleteAsset).Methods("DELETE")
+	// Assets
+	router.HandleFunc("/assets", webapp.readAssets).Methods("GET")
+	router.HandleFunc("/assets", webapp.createAsset).Methods("POST")
+	router.HandleFunc("/assets/{id:[0-9]+}", webapp.updateAsset).Methods("POST")
+	router.HandleFunc("/assets/{id:[0-9]+}", webapp.readAsset).Methods("GET")
+	router.HandleFunc("/assets/{id:[0-9]+}", webapp.deleteAsset).Methods("DELETE")
+
+	// Report scopes
+	router.HandleFunc("/assets/reportScopes", webapp.readReportScopes).Methods("GET")
+	router.HandleFunc("/assets/reportScopes/{id:[0-9]+}", webapp.deleteReportScope).Methods("DELETE")
+
+	startFindingUpdateListener(context.Background(), application, Loaded.Event.ConnectionString, Loaded.Event.FindingUpdates)
+
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", Loaded.Listen.Host, Loaded.Listen.Port), router))
 }
