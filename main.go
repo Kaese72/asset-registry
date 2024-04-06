@@ -405,7 +405,7 @@ func main() {
 		jwtSecret:   Loaded.JWT.Secret,
 	}
 
-	router := mux.NewRouter()
+	router := mux.NewRouter().PathPrefix("/asset-registry").Subrouter()
 	router.Use(webapp.authMiddleware)
 
 	// Assets
