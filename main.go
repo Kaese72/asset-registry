@@ -419,7 +419,10 @@ func main() {
 	router.HandleFunc("/assets/reportScopes", webapp.readReportScopes).Methods("GET")
 	router.HandleFunc("/assets/reportScopes/{id:[0-9]+}", webapp.deleteReportScope).Methods("DELETE")
 
-	startFindingUpdateListener(context.Background(), application, Loaded.Event.ConnectionString, Loaded.Event.FindingUpdates)
+	err = startFindingUpdateListener(context.Background(), application, Loaded.Event.ConnectionString, Loaded.Event.FindingUpdates)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", Loaded.Listen.Host, Loaded.Listen.Port), router))
 }
