@@ -279,7 +279,7 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 	msgs, err := channel.Consume(
 		queue.Name, // queue
 		"",         // consumer
-		true,       // auto-ack
+		true,       // auto-ack // FIXME do not auto-ack
 		false,      // exclusive
 		false,      // no-local
 		false,      // no-wait
@@ -299,9 +299,10 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 				err := json.Unmarshal(msg.Body, &findingUpdate)
 				if err != nil {
 					log.Printf("error parsing message: %s", err.Error())
+					// FIXME Should not ACK the message
 					continue
 				}
-				_, err = app.PutReportScope(registryModels.ReportScope{
+				scope, newCreated, err := app.PutReportScope(registryModels.ReportScope{
 					Type:  findingUpdate.ReportLocator.Type,
 					Value: findingUpdate.ReportLocator.Value,
 				},
@@ -309,7 +310,29 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 				)
 				if err != nil {
 					log.Printf("Error while PUTting discovered scope: %s", err.Error())
+					// FIXME Should rollback and not ACK the message
 					continue
+				}
+				if newCreated {
+					newAsset, err := app.CreateAsset(
+						context.Background(),
+						registryModels.Asset{
+							Name:         scope.Value,
+							ReportScopes: []registryModels.ReportScope{},
+						},
+						findingUpdate.OrganizationId,
+					)
+					if err != nil {
+						log.Printf("Error while creating asset for new scope: %s", err.Error())
+						// FIXME Should rollback and not ACK the message
+						continue
+					}
+					err = app.LinkReportScopeToAsset(context.Background(), newAsset.ID, scope.ID)
+					if err != nil {
+						log.Printf("Error while linking new asset to new scope: %s", err.Error())
+						// FIXME Should rollback and not ACK the message
+						continue
+					}
 				}
 			}
 		}

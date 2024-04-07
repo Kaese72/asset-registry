@@ -23,7 +23,7 @@ func (app Application) ReadAssets(ctx context.Context, filters []database.Filter
 func (app Application) CreateAsset(ctx context.Context, asset models.Asset, organizationId int) (models.RegistryAsset, error) {
 	reportedScopes := []models.RegistryReportScope{}
 	for _, model := range asset.ReportScopes {
-		scope, err := app.PutReportScope(model, organizationId)
+		scope, _, err := app.PutReportScope(model, organizationId)
 		if err != nil {
 			return models.RegistryAsset{}, err
 		}
@@ -59,7 +59,7 @@ func (app Application) DeleteAsset(ctx context.Context, id int, organizationId i
 	return database.DBDeleteRegistryAsset(app.db, id, organizationId)
 }
 
-func (app Application) PutReportScope(reportScope models.ReportScope, organizationId int) (models.RegistryReportScope, error) {
+func (app Application) PutReportScope(reportScope models.ReportScope, organizationId int) (models.RegistryReportScope, bool, error) {
 	return database.DBPutReportScope(app.db, reportScope, organizationId)
 }
 

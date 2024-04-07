@@ -175,19 +175,20 @@ func DBReadReportScope(db *sql.DB, id int, organizationId int) (models.RegistryR
 	return scopes[0], nil
 }
 
-func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId int) (models.RegistryReportScope, error) {
+func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId int) (models.RegistryReportScope, bool, error) {
 	resScopes := []models.RegistryReportScope{}
 	// When we trigger the unique constraint, its fine to ignore the error
 	result, err := db.Query(`INSERT IGNORE INTO assetReportScope (type, value, organizationId) VALUES (?, ?, ?) RETURNING *`, inputScope.Type, inputScope.Value, organizationId)
 	if err != nil {
-		return models.RegistryReportScope{}, err
+		return models.RegistryReportScope{}, false, err
 	}
 	err = sqlscan.ScanAll(&resScopes, result)
 	if err != nil {
-		return models.RegistryReportScope{}, err
+		return models.RegistryReportScope{}, false, err
 	}
 	if len(resScopes) > 0 {
-		return resScopes[0], nil
+		// An INSERT actually happened, meaning we did not have to ignore a constraint error
+		return resScopes[0], true, nil
 
 	} else {
 		resScopes, err := DBReadReportScopes(db, []Filter{
@@ -196,14 +197,15 @@ func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId 
 			{Key: "organizationId", Value: strconv.Itoa(organizationId), Operator: EQ},
 		})
 		if err != nil {
-			return models.RegistryReportScope{}, err
+			return models.RegistryReportScope{}, false, err
 		}
 		if len(resScopes) > 0 {
-			return resScopes[0], nil
+			// A constraint error was ignored and we have to return the existing scope
+			return resScopes[0], false, nil
 		}
 	}
 
-	return models.RegistryReportScope{}, errors.New("no scope returned from insert")
+	return models.RegistryReportScope{}, false, errors.New("no scope returned from insert")
 }
 
 func DBDeleteReportScope(db *sql.DB, id int, organizationId int) error {
