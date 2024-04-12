@@ -48,7 +48,7 @@ func DBReadRegistryAssets(db *sql.DB, filters []Filter) ([]models.RegistryAsset,
 		"id",
 		"organizationId",
 		"name",
-		"(select COALESCE(JSON_ARRAYAGG(JSON_OBJECT(\"type\", type, \"value\", value)), JSON_ARRAY()) FROM assetReportScopeAssetMap INNER JOIN assetReportScope ON assetReportScopeAssetMap.assetReportScopeId = assetReportScope.id  WHERE assetId = assets.id) as reportScopes",
+		"(select COALESCE(JSON_ARRAYAGG(JSON_OBJECT(\"type\", type, \"value\", value, \"distinguisher\", distinguisher)), JSON_ARRAY()) FROM assetReportScopeAssetMap INNER JOIN assetReportScope ON assetReportScopeAssetMap.assetReportScopeId = assetReportScope.id  WHERE assetId = assets.id) as reportScopes",
 	}
 	query := `SELECT ` + strings.Join(fields, ",") + ` FROM assets`
 	variables := []interface{}{}
@@ -124,6 +124,9 @@ func init() {
 	registryReportScopeFilterConverters["value"] = func(f Filter) (string, error) {
 		return f.String()
 	}
+	registryReportScopeFilterConverters["distinguisher"] = func(f Filter) (string, error) {
+		return f.String()
+	}
 	registryReportScopeFilterConverters["organizationId"] = func(f Filter) (string, error) {
 		return f.Number()
 	}
@@ -178,7 +181,7 @@ func DBReadReportScope(db *sql.DB, id int, organizationId int) (models.RegistryR
 func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId int) (models.RegistryReportScope, bool, error) {
 	resScopes := []models.RegistryReportScope{}
 	// When we trigger the unique constraint, its fine to ignore the error
-	result, err := db.Query(`INSERT IGNORE INTO assetReportScope (type, value, organizationId) VALUES (?, ?, ?) RETURNING *`, inputScope.Type, inputScope.Value, organizationId)
+	result, err := db.Query(`INSERT IGNORE INTO assetReportScope (type, value, distinguisher, organizationId) VALUES (?, ?, ?, ?) RETURNING *`, inputScope.Type, inputScope.Value, inputScope.Distinguisher, organizationId)
 	if err != nil {
 		return models.RegistryReportScope{}, false, err
 	}
@@ -194,6 +197,7 @@ func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId 
 		resScopes, err := DBReadReportScopes(db, []Filter{
 			{Key: "type", Value: inputScope.Type, Operator: EQ},
 			{Key: "value", Value: inputScope.Value, Operator: EQ},
+			{Key: "distinguisher", Value: inputScope.Distinguisher, Operator: EQ},
 			{Key: "organizationId", Value: strconv.Itoa(organizationId), Operator: EQ},
 		})
 		if err != nil {

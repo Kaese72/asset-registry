@@ -303,8 +303,9 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 					continue
 				}
 				scope, newCreated, err := app.PutReportScope(registryModels.ReportScope{
-					Type:  findingUpdate.ReportLocator.Type,
-					Value: findingUpdate.ReportLocator.Value,
+					Type:          findingUpdate.ReportLocator.Type,
+					Value:         findingUpdate.ReportLocator.Value,
+					Distinguisher: findingUpdate.ReportLocator.Distinguisher,
 				},
 					findingUpdate.OrganizationId,
 				)

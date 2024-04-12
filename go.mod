@@ -6,7 +6,7 @@ toolchain go1.22.0
 
 require github.com/spf13/viper v1.18.2
 
-require github.com/Kaese72/finding-registry v0.0.5
+require github.com/Kaese72/finding-registry v0.0.9
 
 require github.com/rabbitmq/amqp091-go v1.9.0
 

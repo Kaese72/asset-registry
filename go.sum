@@ -1,5 +1,5 @@
-github.com/Kaese72/finding-registry v0.0.5 h1:x3yI0GgQnVkOAlQXspvl5yuGaj1FCJ9ISgsvhfy1rsI=
-github.com/Kaese72/finding-registry v0.0.5/go.mod h1:W/6T6i6OSTAaGLqfwCgn9/YvqI5CTL1TASSOZl6nwp8=
+github.com/Kaese72/finding-registry v0.0.9 h1:QADsHnbsmAPmJKoNKhpYVz0W1VdF4CZ9HT7BEvq0zQ4=
+github.com/Kaese72/finding-registry v0.0.9/go.mod h1:YIAHwxkXvqV4QSrX31DZ/wA69+3AFTYfqak1VTmx3Ac=
 github.com/cockroachdb/cockroach-go/v2 v2.2.0 h1:/5znzg5n373N/3ESjHF5SMLxiW4RKB05Ql//KWfeTFs=
 github.com/cockroachdb/cockroach-go/v2 v2.2.0/go.mod h1:u3MiKYGupPPjkn3ozknpMUpxPaNLTFWAya419/zv6eI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
