@@ -42,7 +42,7 @@ func DBRegistryAssetFilter(filters []Filter) (string, []interface{}, error) {
 	return strings.Join(queryFragments, " AND "), args, nil
 }
 
-func DBReadRegistryAssets(db *sql.DB, filters []Filter) ([]models.RegistryAsset, error) {
+func DBReadRegistryAssets(ctx context.Context, db *sql.DB, filters []Filter) ([]models.RegistryAsset, error) {
 	assets := []models.RegistryAsset{}
 	fields := []string{
 		"id",
@@ -60,12 +60,12 @@ func DBReadRegistryAssets(db *sql.DB, filters []Filter) ([]models.RegistryAsset,
 	} else {
 		return nil, err
 	}
-	err := sqlscan.Select(context.TODO(), db, &assets, query, variables...)
+	err := sqlscan.Select(ctx, db, &assets, query, variables...)
 	return assets, err
 }
 
-func DBReadRegistryAsset(db *sql.DB, id int, organizationId int) (models.RegistryAsset, error) {
-	assets, err := DBReadRegistryAssets(db, []Filter{{Key: "id", Value: strconv.Itoa(id), Operator: EQ}, {Key: "organizationId", Value: strconv.Itoa(organizationId), Operator: EQ}})
+func DBReadRegistryAsset(ctx context.Context, db *sql.DB, id int, organizationId int) (models.RegistryAsset, error) {
+	assets, err := DBReadRegistryAssets(ctx, db, []Filter{{Key: "id", Value: strconv.Itoa(id), Operator: EQ}, {Key: "organizationId", Value: strconv.Itoa(organizationId), Operator: EQ}})
 	if err != nil {
 		return models.RegistryAsset{}, err
 	}
@@ -75,10 +75,10 @@ func DBReadRegistryAsset(db *sql.DB, id int, organizationId int) (models.Registr
 	return assets[0], nil
 }
 
-func DBInsertRegistryAsset(db *sql.DB, inputAsset models.Asset, organizationId int) (models.RegistryAsset, error) {
+func DBInsertRegistryAsset(ctx context.Context, db *sql.DB, inputAsset models.Asset, organizationId int) (models.RegistryAsset, error) {
 	resAssets := []models.RegistryAsset{}
 	// FIXME correct insert statement
-	result, err := db.Query(`INSERT INTO assets (name, organizationId) VALUES (?, ?) RETURNING *`, inputAsset.Name, organizationId)
+	result, err := db.QueryContext(ctx, `INSERT INTO assets (name, organizationId) VALUES (?, ?) RETURNING *`, inputAsset.Name, organizationId)
 	if err != nil {
 		return models.RegistryAsset{}, err
 	}
@@ -92,16 +92,16 @@ func DBInsertRegistryAsset(db *sql.DB, inputAsset models.Asset, organizationId i
 	return resAssets[0], nil
 }
 
-func DBUpdateRegistryAsset(db *sql.DB, asset models.Asset, id int, organizationId int) (models.RegistryAsset, error) {
+func DBUpdateRegistryAsset(ctx context.Context, db *sql.DB, asset models.Asset, id int, organizationId int) (models.RegistryAsset, error) {
 	_, err := db.Exec(`UPDATE assets SET name = ? WHERE id = ? AND organizationId = ?`, asset.Name, id, organizationId)
 	if err != nil {
 		return models.RegistryAsset{}, err
 	}
-	return DBReadRegistryAsset(db, id, organizationId)
+	return DBReadRegistryAsset(ctx, db, id, organizationId)
 }
 
-func DBDeleteRegistryAsset(db *sql.DB, id int, organizationId int) error {
-	res, err := db.Exec(`DELETE FROM assets WHERE id = ? AND organizationId = ?`, id, organizationId)
+func DBDeleteRegistryAsset(ctx context.Context, db *sql.DB, id int, organizationId int) error {
+	res, err := db.ExecContext(ctx, `DELETE FROM assets WHERE id = ? AND organizationId = ?`, id, organizationId)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func DBRegistryReportScopeFilter(filters []Filter) (string, []interface{}, error
 	return strings.Join(queryFragments, " AND "), args, nil
 }
 
-func DBReadReportScopes(db *sql.DB, filters []Filter) ([]models.RegistryReportScope, error) {
+func DBReadReportScopes(ctx context.Context, db *sql.DB, filters []Filter) ([]models.RegistryReportScope, error) {
 	scopes := []models.RegistryReportScope{}
 	query := `SELECT * FROM assetReportScope`
 	variables := []interface{}{}
@@ -162,13 +162,13 @@ func DBReadReportScopes(db *sql.DB, filters []Filter) ([]models.RegistryReportSc
 	} else {
 		return nil, err
 	}
-	err := sqlscan.Select(context.TODO(), db, &scopes, query, variables...)
+	err := sqlscan.Select(ctx, db, &scopes, query, variables...)
 	return scopes, err
 }
 
-func DBReadReportScope(db *sql.DB, id int, organizationId int) (models.RegistryReportScope, error) {
+func DBReadReportScope(ctx context.Context, db *sql.DB, id int, organizationId int) (models.RegistryReportScope, error) {
 	scopes := []models.RegistryReportScope{}
-	err := sqlscan.Select(context.TODO(), db, &scopes, `SELECT * FROM assetReportScope WHERE id = ? AND organizationId = ?`, id, organizationId)
+	err := sqlscan.Select(ctx, db, &scopes, `SELECT * FROM assetReportScope WHERE id = ? AND organizationId = ?`, id, organizationId)
 	if err != nil {
 		return models.RegistryReportScope{}, err
 	}
@@ -178,10 +178,10 @@ func DBReadReportScope(db *sql.DB, id int, organizationId int) (models.RegistryR
 	return scopes[0], nil
 }
 
-func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId int) (models.RegistryReportScope, bool, error) {
+func DBPutReportScope(ctx context.Context, db *sql.DB, inputScope models.ReportScope, organizationId int) (models.RegistryReportScope, bool, error) {
 	resScopes := []models.RegistryReportScope{}
 	// When we trigger the unique constraint, its fine to ignore the error
-	result, err := db.Query(`INSERT IGNORE INTO assetReportScope (type, value, distinguisher, organizationId) VALUES (?, ?, ?, ?) RETURNING *`, inputScope.Type, inputScope.Value, inputScope.Distinguisher, organizationId)
+	result, err := db.QueryContext(ctx, `INSERT IGNORE INTO assetReportScope (type, value, distinguisher, organizationId) VALUES (?, ?, ?, ?) RETURNING *`, inputScope.Type, inputScope.Value, inputScope.Distinguisher, organizationId)
 	if err != nil {
 		return models.RegistryReportScope{}, false, err
 	}
@@ -194,7 +194,7 @@ func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId 
 		return resScopes[0], true, nil
 
 	} else {
-		resScopes, err := DBReadReportScopes(db, []Filter{
+		resScopes, err := DBReadReportScopes(ctx, db, []Filter{
 			{Key: "type", Value: inputScope.Type, Operator: EQ},
 			{Key: "value", Value: inputScope.Value, Operator: EQ},
 			{Key: "distinguisher", Value: inputScope.Distinguisher, Operator: EQ},
@@ -212,8 +212,8 @@ func DBPutReportScope(db *sql.DB, inputScope models.ReportScope, organizationId 
 	return models.RegistryReportScope{}, false, errors.New("no scope returned from insert")
 }
 
-func DBDeleteReportScope(db *sql.DB, id int, organizationId int) error {
-	res, err := db.Exec(`DELETE FROM assetReportScope WHERE id = ? AND organizationId = ?`, id, organizationId)
+func DBDeleteReportScope(ctx context.Context, db *sql.DB, id int, organizationId int) error {
+	res, err := db.ExecContext(ctx, `DELETE FROM assetReportScope WHERE id = ? AND organizationId = ?`, id, organizationId)
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func DBDeleteReportScope(db *sql.DB, id int, organizationId int) error {
 	return nil
 }
 
-func DBLinkReportScopeToAsset(db *sql.DB, assetId int, scopeId int) error {
-	_, err := db.Exec(`INSERT INTO assetReportScopeAssetMap (assetId, assetReportScopeId) VALUES (?, ?)`, assetId, scopeId)
+func DBLinkReportScopeToAsset(ctx context.Context, db *sql.DB, assetId int, scopeId int) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO assetReportScopeAssetMap (assetId, assetReportScopeId) VALUES (?, ?)`, assetId, scopeId)
 	return err
 }

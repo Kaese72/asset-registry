@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/Kaese72/riskie-lib/logging"
+	"go.elastic.co/apm/module/apmgorilla"
 
 	"github.com/Kaese72/asset-registry/apierrors"
 	"github.com/Kaese72/asset-registry/internal/application"
@@ -303,11 +304,13 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 					// FIXME Should not ACK the message
 					continue
 				}
-				scope, newCreated, err := app.PutReportScope(registryModels.ReportScope{
-					Type:          findingUpdate.ReportLocator.Type,
-					Value:         findingUpdate.ReportLocator.Value,
-					Distinguisher: findingUpdate.ReportLocator.Distinguisher,
-				},
+				scope, newCreated, err := app.PutReportScope(
+					ctx,
+					registryModels.ReportScope{
+						Type:          findingUpdate.ReportLocator.Type,
+						Value:         findingUpdate.ReportLocator.Value,
+						Distinguisher: findingUpdate.ReportLocator.Distinguisher,
+					},
 					findingUpdate.OrganizationId,
 				)
 				if err != nil {
@@ -431,6 +434,7 @@ func main() {
 	}
 
 	router := mux.NewRouter().PathPrefix("/asset-registry").Subrouter()
+	apmgorilla.Instrument(router)
 	router.Use(webapp.authMiddleware)
 
 	// Assets
