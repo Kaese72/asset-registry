@@ -1,8 +1,6 @@
 module github.com/Kaese72/asset-registry
 
-go 1.22
-
-toolchain go1.22.0
+go 1.22.0
 
 require github.com/spf13/viper v1.18.2
 
@@ -11,6 +9,7 @@ require github.com/Kaese72/finding-registry v0.0.9
 require github.com/rabbitmq/amqp091-go v1.9.0
 
 require (
+	github.com/Kaese72/riskie-lib v0.0.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/georgysavva/scany/v2 v2.1.0

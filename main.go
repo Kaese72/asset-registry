@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/Kaese72/riskie-lib/logging"
 
 	"github.com/Kaese72/asset-registry/apierrors"
 	"github.com/Kaese72/asset-registry/internal/application"
@@ -31,27 +32,27 @@ type webApplication struct {
 	jwtSecret   string
 }
 
-func terminalHTTPError(w http.ResponseWriter, err error) {
+func terminalHTTPError(ctx context.Context, w http.ResponseWriter, err error) {
 	var apiError apierrors.APIError
 	if errors.As(err, &apiError) {
 		if apiError.Code == 500 {
 			// When an unknown error occurs, do not send the error to the client
 			http.Error(w, "Internal Server Error", apiError.Code)
-			log.Print(err.Error())
+			logging.Error(ctx, err.Error())
 			return
 
 		} else {
 			bytes, intErr := json.MarshalIndent(apiError, "", "   ")
 			if intErr != nil {
 				// Must send a normal Error an not APIError just in case of eternal loop
-				terminalHTTPError(w, fmt.Errorf("error encoding response: %s", intErr.Error()))
+				terminalHTTPError(ctx, w, fmt.Errorf("error encoding response: %s", intErr.Error()))
 				return
 			}
 			http.Error(w, string(bytes), apiError.Code)
 			return
 		}
 	} else {
-		terminalHTTPError(w, apierrors.APIError{Code: http.StatusInternalServerError, WrappedError: err})
+		terminalHTTPError(ctx, w, apierrors.APIError{Code: http.StatusInternalServerError, WrappedError: err})
 		return
 	}
 }
@@ -75,7 +76,7 @@ func parseQueryFilters(r *http.Request) []database.Filter {
 func (app webApplication) readAssets(w http.ResponseWriter, r *http.Request) {
 	assets, err := app.application.ReadAssets(r.Context(), parseQueryFilters(r))
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -84,7 +85,7 @@ func (app webApplication) readAssets(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(assets); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
@@ -95,7 +96,7 @@ func (app webApplication) readAsset(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	asset, err := app.application.ReadAsset(r.Context(), id, organizationId)
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -104,7 +105,7 @@ func (app webApplication) readAsset(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(asset); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
@@ -113,12 +114,12 @@ func (app webApplication) createAsset(w http.ResponseWriter, r *http.Request) {
 	organizationId := r.Context().Value(organizationIDKey).(float64)
 	inputAsset := registryModels.Asset{}
 	if err := json.NewDecoder(r.Body).Decode(&inputAsset); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error decoding request: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error decoding request: %s", err.Error()))
 		return
 	}
 	asset, err := app.application.CreateAsset(r.Context(), inputAsset, int(organizationId))
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -127,7 +128,7 @@ func (app webApplication) createAsset(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(asset); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
@@ -136,7 +137,7 @@ func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
 	organizationId := int(r.Context().Value(organizationIDKey).(float64))
 	inputAsset := registryModels.Asset{}
 	if err := json.NewDecoder(r.Body).Decode(&inputAsset); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error decoding request: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error decoding request: %s", err.Error()))
 		return
 	}
 
@@ -144,7 +145,7 @@ func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	asset, err := app.application.UpdateAsset(r.Context(), inputAsset, id, organizationId)
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -153,7 +154,7 @@ func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(asset); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
@@ -164,7 +165,7 @@ func (app webApplication) deleteAsset(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	err := app.application.DeleteAsset(r.Context(), id, organizationId)
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 }
@@ -172,7 +173,7 @@ func (app webApplication) deleteAsset(w http.ResponseWriter, r *http.Request) {
 func (app webApplication) readReportScopes(w http.ResponseWriter, r *http.Request) {
 	scopes, err := app.application.ReadReportScopes(r.Context(), parseQueryFilters(r))
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -181,7 +182,7 @@ func (app webApplication) readReportScopes(w http.ResponseWriter, r *http.Reques
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(scopes); err != nil {
-		terminalHTTPError(w, fmt.Errorf("error encoding response: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
@@ -192,7 +193,7 @@ func (app webApplication) deleteReportScope(w http.ResponseWriter, r *http.Reque
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	err := app.application.DeleteReportScope(r.Context(), id, organizationId)
 	if err != nil {
-		terminalHTTPError(w, fmt.Errorf("error from database: %s", err.Error()))
+		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 }
@@ -222,29 +223,29 @@ func (app webApplication) authMiddleware(next http.Handler) http.Handler {
 		})
 
 		if err != nil {
-			terminalHTTPError(w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: fmt.Errorf("error parsing token: %s", err.Error())})
+			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: fmt.Errorf("error parsing token: %s", err.Error())})
 			return
 		}
 
 		if !token.Valid {
-			terminalHTTPError(w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("invalid token")})
+			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("invalid token")})
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			terminalHTTPError(w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read claims")})
+			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read claims")})
 			return
 		}
 
 		userID, ok := claims[string(userIDKey)].(float64)
 		if !ok {
-			terminalHTTPError(w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read userId claim")})
+			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read userId claim")})
 			return
 		}
 		organizationID, ok := claims[string(organizationIDKey)].(float64)
 		if !ok {
-			terminalHTTPError(w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read organizationId claim")})
+			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read organizationId claim")})
 			return
 		}
 
@@ -298,7 +299,7 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 				var findingUpdate findingRegistryModels.FindingUpdate
 				err := json.Unmarshal(msg.Body, &findingUpdate)
 				if err != nil {
-					log.Printf("error parsing message: %s", err.Error())
+					logging.Error(context.Background(), "error parsing message", map[string]interface{}{"error": err.Error()})
 					// FIXME Should not ACK the message
 					continue
 				}
@@ -310,7 +311,7 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 					findingUpdate.OrganizationId,
 				)
 				if err != nil {
-					log.Printf("Error while PUTting discovered scope: %s", err.Error())
+					logging.Error(context.Background(), "Error while PUTting discovered scope", map[string]interface{}{"error": err.Error()})
 					// FIXME Should rollback and not ACK the message
 					continue
 				}
@@ -324,13 +325,13 @@ func startFindingUpdateListener(ctx context.Context, app application.Application
 						findingUpdate.OrganizationId,
 					)
 					if err != nil {
-						log.Printf("Error while creating asset for new scope: %s", err.Error())
+						logging.Error(context.Background(), "Error while creating asset for new scope", map[string]interface{}{"error": err.Error()})
 						// FIXME Should rollback and not ACK the message
 						continue
 					}
 					err = app.LinkReportScopeToAsset(context.Background(), newAsset.ID, scope.ID)
 					if err != nil {
-						log.Printf("Error while linking new asset to new scope: %s", err.Error())
+						logging.Error(context.Background(), "Error while linking new asset to new scope", map[string]interface{}{"error": err.Error()})
 						// FIXME Should rollback and not ACK the message
 						continue
 					}
@@ -391,34 +392,34 @@ func init() {
 
 	err := viper.Unmarshal(&Loaded)
 	if err != nil {
-		log.Fatal(err.Error())
+		logging.Fatal(context.Background(), err.Error())
 	}
 
 	if Loaded.Database.Host == "" {
-		log.Fatal("Database host not set")
+		logging.Fatal(context.Background(), "Database host not set")
 	}
 
 	if Loaded.Database.Password == "" {
-		log.Fatal("Database password not set")
+		logging.Fatal(context.Background(), "Database password not set")
 	}
 
 	if Loaded.Database.User == "" {
-		log.Fatal("Database user not set")
+		logging.Fatal(context.Background(), "Database user not set")
 	}
 
 	if Loaded.JWT.Secret == "" {
-		log.Fatal("JWT secret key not set")
+		logging.Fatal(context.Background(), "JWT secret key not set")
 	}
 
 	if Loaded.Event.ConnectionString == "" {
-		log.Fatal("Event connection string not set")
+		logging.Fatal(context.Background(), "Event connection string not set")
 	}
 }
 
 func main() {
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", Loaded.Database.User, Loaded.Database.Password, Loaded.Database.Host, Loaded.Database.Port, Loaded.Database.Database))
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(context.Background(), err.Error())
 	}
 	defer db.Close()
 
@@ -445,8 +446,8 @@ func main() {
 
 	err = startFindingUpdateListener(context.Background(), application, Loaded.Event.ConnectionString, Loaded.Event.FindingUpdates)
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(context.Background(), err.Error())
 	}
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", Loaded.Listen.Host, Loaded.Listen.Port), router))
+	logging.Fatal(context.Background(), http.ListenAndServe(fmt.Sprintf("%s:%d", Loaded.Listen.Host, Loaded.Listen.Port), router).Error())
 }
