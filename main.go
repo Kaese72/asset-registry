@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"go.elastic.co/apm/module/apmsql"
+	_ "go.elastic.co/apm/module/apmsql/mysql"
 
 	"github.com/Kaese72/riskie-lib/logging"
 	"go.elastic.co/apm/module/apmgorilla"
@@ -22,7 +23,6 @@ import (
 	registryModels "github.com/Kaese72/asset-registry/registry/models"
 	findingRegistryModels "github.com/Kaese72/finding-registry/event"
 	"github.com/dgrijalva/jwt-go"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 
