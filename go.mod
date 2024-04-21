@@ -9,6 +9,7 @@ require github.com/Kaese72/finding-registry v0.0.9
 require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	go.elastic.co/apm/module/apmgorilla v1.15.0
+	go.elastic.co/apm/module/apmsql v1.15.0
 )
 
 require (
