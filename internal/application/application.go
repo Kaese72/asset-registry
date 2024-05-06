@@ -60,6 +60,8 @@ func (app Application) UpdateAsset(ctx context.Context, asset models.Asset, id i
 				return models.RegistryAsset{}, err
 			}
 			shouldHaveIds = append(shouldHaveIds, scope.ID)
+			// This makes sure links that should be present are present
+			database.DBLinkReportScopeToAsset(ctx, app.db, id, scope.ID)
 		}
 		// This deletes all report scope links except those we should have
 		err := database.DBDeleteReportScopesExcept(ctx, app.db, id, organizationId, shouldHaveIds)
