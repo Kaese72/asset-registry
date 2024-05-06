@@ -21,7 +21,9 @@ func init() {
 	registryAssetFilterConverters["id"] = func(f Filter) (string, error) {
 		return f.Number()
 	}
-
+	registryAssetFilterConverters["organizationId"] = func(f Filter) (string, error) {
+		return f.Number()
+	}
 }
 
 func DBRegistryAssetFilter(filters []Filter) (string, []interface{}, error) {
@@ -42,7 +44,8 @@ func DBRegistryAssetFilter(filters []Filter) (string, []interface{}, error) {
 	return strings.Join(queryFragments, " AND "), args, nil
 }
 
-func DBReadRegistryAssets(ctx context.Context, db *sql.DB, filters []Filter) ([]models.RegistryAsset, error) {
+func DBReadRegistryAssets(ctx context.Context, db *sql.DB, filters []Filter, organizationId int) ([]models.RegistryAsset, error) {
+	filters = append(filters, Filter{Key: "organizationId", Value: strconv.Itoa(organizationId), Operator: EQ})
 	assets := []models.RegistryAsset{}
 	fields := []string{
 		"id",
@@ -65,7 +68,7 @@ func DBReadRegistryAssets(ctx context.Context, db *sql.DB, filters []Filter) ([]
 }
 
 func DBReadRegistryAsset(ctx context.Context, db *sql.DB, id int, organizationId int) (models.RegistryAsset, error) {
-	assets, err := DBReadRegistryAssets(ctx, db, []Filter{{Key: "id", Value: strconv.Itoa(id), Operator: EQ}, {Key: "organizationId", Value: strconv.Itoa(organizationId), Operator: EQ}})
+	assets, err := DBReadRegistryAssets(ctx, db, []Filter{{Key: "id", Value: strconv.Itoa(id), Operator: EQ}}, organizationId)
 	if err != nil {
 		return models.RegistryAsset{}, err
 	}

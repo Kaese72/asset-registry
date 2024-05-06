@@ -76,7 +76,8 @@ func parseQueryFilters(r *http.Request) []database.Filter {
 }
 
 func (app webApplication) readAssets(w http.ResponseWriter, r *http.Request) {
-	assets, err := app.application.ReadAssets(r.Context(), parseQueryFilters(r))
+	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	assets, err := app.application.ReadAssets(r.Context(), parseQueryFilters(r), organizationId)
 	if err != nil {
 		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return

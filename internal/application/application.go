@@ -16,8 +16,8 @@ func NewApplication(db *sql.DB) Application {
 	return Application{db: db}
 }
 
-func (app Application) ReadAssets(ctx context.Context, filters []database.Filter) ([]models.RegistryAsset, error) {
-	return database.DBReadRegistryAssets(ctx, app.db, filters)
+func (app Application) ReadAssets(ctx context.Context, filters []database.Filter, organizationId int) ([]models.RegistryAsset, error) {
+	return database.DBReadRegistryAssets(ctx, app.db, filters, organizationId)
 }
 
 func (app Application) CreateAsset(ctx context.Context, asset models.Asset, organizationId int) (models.RegistryAsset, error) {
