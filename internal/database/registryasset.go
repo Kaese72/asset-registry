@@ -232,7 +232,7 @@ func DBDeleteReportScope(ctx context.Context, db *sql.DB, id int, organizationId
 
 func DBDeleteReportScopesExcept(ctx context.Context, db *sql.DB, assetId int, organizationId int, excepts []int) error {
 	var params []interface{}
-	params = append(params, assetId, organizationId)
+	params = append(params, assetId)
 	inCondition := ""
 	for _, except := range excepts {
 		params = append(params, except)
@@ -241,7 +241,7 @@ func DBDeleteReportScopesExcept(ctx context.Context, db *sql.DB, assetId int, or
 		}
 		inCondition += "?"
 	}
-	res, err := db.ExecContext(ctx, `DELETE FROM assetReportScopeAssetMap WHERE assetId = ? AND organizationId = ? AND assetReportScopeId NOT IN (`+inCondition+`)`, params...)
+	res, err := db.ExecContext(ctx, `DELETE FROM assetReportScopeAssetMap WHERE assetId = ? AND assetReportScopeId NOT IN (`+inCondition+`)`, params...)
 	if err != nil {
 		return err
 	}
