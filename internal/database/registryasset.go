@@ -230,6 +230,31 @@ func DBDeleteReportScope(ctx context.Context, db *sql.DB, id int, organizationId
 	return nil
 }
 
+func DBDeleteReportScopesExcept(ctx context.Context, db *sql.DB, assetId int, organizationId int, excepts []int) error {
+	var params []interface{}
+	params = append(params, assetId, organizationId)
+	inCondition := ""
+	for _, except := range excepts {
+		params = append(params, except)
+		if inCondition != "" {
+			inCondition += ", "
+		}
+		inCondition += "?"
+	}
+	res, err := db.ExecContext(ctx, `DELETE FROM assetReportScopeAssetMap WHERE assetId = ? AND organizationId = ? AND assetReportScopeId NOT IN (`+inCondition+`)`, params...)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return apierrors.APIError{Code: 404, WrappedError: errors.New("scope not found")}
+	}
+	return nil
+}
+
 func DBLinkReportScopeToAsset(ctx context.Context, db *sql.DB, assetId int, scopeId int) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO assetReportScopeAssetMap (assetId, assetReportScopeId) VALUES (?, ?)`, assetId, scopeId)
 	return err

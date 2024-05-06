@@ -442,7 +442,7 @@ func main() {
 	// Assets
 	router.HandleFunc("/assets", webapp.readAssets).Methods("GET")
 	router.HandleFunc("/assets", webapp.createAsset).Methods("POST")
-	router.HandleFunc("/assets/{id:[0-9]+}", webapp.updateAsset).Methods("POST")
+	router.HandleFunc("/assets/{id:[0-9]+}", webapp.updateAsset).Methods("PATCH")
 	router.HandleFunc("/assets/{id:[0-9]+}", webapp.readAsset).Methods("GET")
 	router.HandleFunc("/assets/{id:[0-9]+}", webapp.deleteAsset).Methods("DELETE")
 

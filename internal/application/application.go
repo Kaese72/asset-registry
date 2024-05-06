@@ -52,6 +52,21 @@ func (app Application) ReadAsset(ctx context.Context, id int, organizationId int
 }
 
 func (app Application) UpdateAsset(ctx context.Context, asset models.Asset, id int, organizationId int) (models.RegistryAsset, error) {
+	if len(asset.ReportScopes) > 0 {
+		shouldHaveIds := []int{}
+		for _, model := range asset.ReportScopes {
+			scope, _, err := app.PutReportScope(ctx, model, organizationId)
+			if err != nil {
+				return models.RegistryAsset{}, err
+			}
+			shouldHaveIds = append(shouldHaveIds, scope.ID)
+		}
+		// This deletes all report scope links except those we should have
+		err := database.DBDeleteReportScopesExcept(ctx, app.db, id, organizationId, shouldHaveIds)
+		if err != nil {
+			return models.RegistryAsset{}, err
+		}
+	}
 	return database.DBUpdateRegistryAsset(ctx, app.db, asset, id, organizationId)
 }
 
