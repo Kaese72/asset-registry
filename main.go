@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -13,16 +12,16 @@ import (
 	"go.elastic.co/apm/module/apmsql"
 	_ "go.elastic.co/apm/module/apmsql/mysql"
 
+	"github.com/Kaese72/riskie-lib/apierror"
 	"github.com/Kaese72/riskie-lib/logging"
 	"go.elastic.co/apm/module/apmgorilla"
 
-	"github.com/Kaese72/asset-registry/apierrors"
 	"github.com/Kaese72/asset-registry/internal/application"
 	"github.com/Kaese72/asset-registry/internal/database"
 
 	registryModels "github.com/Kaese72/asset-registry/registry/models"
 	findingRegistryModels "github.com/Kaese72/finding-registry/event"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/Kaese72/organization-registry/authentication"
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 
@@ -32,31 +31,6 @@ import (
 type webApplication struct {
 	application application.Application
 	jwtSecret   string
-}
-
-func terminalHTTPError(ctx context.Context, w http.ResponseWriter, err error) {
-	var apiError apierrors.APIError
-	if errors.As(err, &apiError) {
-		if apiError.Code == 500 {
-			// When an unknown error occurs, do not send the error to the client
-			http.Error(w, "Internal Server Error", apiError.Code)
-			logging.Error(ctx, err.Error())
-			return
-
-		} else {
-			bytes, intErr := json.MarshalIndent(apiError, "", "   ")
-			if intErr != nil {
-				// Must send a normal Error an not APIError just in case of eternal loop
-				terminalHTTPError(ctx, w, fmt.Errorf("error encoding response: %s", intErr.Error()))
-				return
-			}
-			http.Error(w, string(bytes), apiError.Code)
-			return
-		}
-	} else {
-		terminalHTTPError(ctx, w, apierrors.APIError{Code: http.StatusInternalServerError, WrappedError: err})
-		return
-	}
 }
 
 var queryRegex = regexp.MustCompile(`^(?P<key>\w+)\[(?P<operator>\w+)\]$`)
@@ -76,10 +50,10 @@ func parseQueryFilters(r *http.Request) []database.Filter {
 }
 
 func (app webApplication) readAssets(w http.ResponseWriter, r *http.Request) {
-	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	organizationId := int(r.Context().Value(authentication.OrganizationIDKey).(float64))
 	assets, err := app.application.ReadAssets(r.Context(), parseQueryFilters(r), organizationId)
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -88,18 +62,18 @@ func (app webApplication) readAssets(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(assets); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
 
 func (app webApplication) readAsset(w http.ResponseWriter, r *http.Request) {
-	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	organizationId := int(r.Context().Value(authentication.OrganizationIDKey).(float64))
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	asset, err := app.application.ReadAsset(r.Context(), id, organizationId)
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -108,21 +82,21 @@ func (app webApplication) readAsset(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(asset); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
 
 func (app webApplication) createAsset(w http.ResponseWriter, r *http.Request) {
-	organizationId := r.Context().Value(organizationIDKey).(float64)
+	organizationId := r.Context().Value(authentication.OrganizationIDKey).(float64)
 	inputAsset := registryModels.Asset{}
 	if err := json.NewDecoder(r.Body).Decode(&inputAsset); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error decoding request: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error decoding request: %s", err.Error()))
 		return
 	}
 	asset, err := app.application.CreateAsset(r.Context(), inputAsset, int(organizationId))
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -131,16 +105,16 @@ func (app webApplication) createAsset(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(asset); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
 
 func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
-	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	organizationId := int(r.Context().Value(authentication.OrganizationIDKey).(float64))
 	inputAsset := registryModels.Asset{}
 	if err := json.NewDecoder(r.Body).Decode(&inputAsset); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error decoding request: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error decoding request: %s", err.Error()))
 		return
 	}
 
@@ -148,7 +122,7 @@ func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	asset, err := app.application.UpdateAsset(r.Context(), inputAsset, id, organizationId)
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -157,18 +131,18 @@ func (app webApplication) updateAsset(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(asset); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
 
 func (app webApplication) deleteAsset(w http.ResponseWriter, r *http.Request) {
-	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	organizationId := int(r.Context().Value(authentication.OrganizationIDKey).(float64))
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	err := app.application.DeleteAsset(r.Context(), id, organizationId)
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 }
@@ -176,7 +150,7 @@ func (app webApplication) deleteAsset(w http.ResponseWriter, r *http.Request) {
 func (app webApplication) readReportScopes(w http.ResponseWriter, r *http.Request) {
 	scopes, err := app.application.ReadReportScopes(r.Context(), parseQueryFilters(r))
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
 
@@ -185,77 +159,20 @@ func (app webApplication) readReportScopes(w http.ResponseWriter, r *http.Reques
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "   ")
 	if err := encoder.Encode(scopes); err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error encoding response: %s", err.Error()))
 		return
 	}
 }
 
 func (app webApplication) deleteReportScope(w http.ResponseWriter, r *http.Request) {
-	organizationId := int(r.Context().Value(organizationIDKey).(float64))
+	organizationId := int(r.Context().Value(authentication.OrganizationIDKey).(float64))
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Ignoring error because mux guarantees this is an int
 	err := app.application.DeleteReportScope(r.Context(), id, organizationId)
 	if err != nil {
-		terminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
+		apierror.TerminalHTTPError(r.Context(), w, fmt.Errorf("error from database: %s", err.Error()))
 		return
 	}
-}
-
-type contextKey string
-
-const (
-	userIDKey         contextKey = "userID"
-	organizationIDKey contextKey = "organizationID"
-)
-
-func (app webApplication) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenString := r.Header.Get("Authorization")
-		if tokenString == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method")
-			}
-			return []byte(app.jwtSecret), nil
-		})
-
-		if err != nil {
-			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: fmt.Errorf("error parsing token: %s", err.Error())})
-			return
-		}
-
-		if !token.Valid {
-			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("invalid token")})
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read claims")})
-			return
-		}
-
-		userID, ok := claims[string(userIDKey)].(float64)
-		if !ok {
-			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read userId claim")})
-			return
-		}
-		organizationID, ok := claims[string(organizationIDKey)].(float64)
-		if !ok {
-			terminalHTTPError(r.Context(), w, apierrors.APIError{Code: http.StatusUnauthorized, WrappedError: errors.New("could not read organizationId claim")})
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), userIDKey, userID)
-		ctx = context.WithValue(ctx, organizationIDKey, organizationID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 func startFindingUpdateListener(ctx context.Context, app application.Application, connectionString string, queueName string) error {
@@ -437,7 +354,7 @@ func main() {
 
 	router := mux.NewRouter().PathPrefix("/asset-registry").Subrouter()
 	apmgorilla.Instrument(router)
-	router.Use(webapp.authMiddleware)
+	router.Use(authentication.DefaultJWTAuthentication(Loaded.JWT.Secret))
 
 	// Assets
 	router.HandleFunc("/assets", webapp.readAssets).Methods("GET")

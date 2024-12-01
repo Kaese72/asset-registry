@@ -6,6 +6,8 @@ require github.com/spf13/viper v1.18.2
 
 require github.com/Kaese72/finding-registry v0.0.9
 
+require github.com/Kaese72/organization-registry v0.0.15
+
 require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	go.elastic.co/apm/module/apmgorilla v1.15.0
@@ -14,8 +16,9 @@ require (
 
 require (
 	github.com/armon/go-radix v1.0.0 // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/elastic/go-licenser v0.3.1 // indirect
-	github.com/elastic/go-sysinfo v1.1.1 // indirect
+	github.com/elastic/go-sysinfo v1.7.1 // indirect
 	github.com/elastic/go-windows v1.0.0 // indirect
 	github.com/jcchavezs/porto v0.1.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
@@ -32,8 +35,7 @@ require (
 )
 
 require (
-	github.com/Kaese72/riskie-lib v0.0.3
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/Kaese72/riskie-lib v0.0.4
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/georgysavva/scany/v2 v2.1.0
 	github.com/go-sql-driver/mysql v1.7.1 // indirect

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Kaese72/asset-registry/apierrors"
 	"github.com/Kaese72/asset-registry/registry/models"
+	"github.com/Kaese72/riskie-lib/apierror"
 	"github.com/georgysavva/scany/v2/sqlscan"
 )
 
@@ -32,11 +32,11 @@ func DBRegistryAssetFilter(filters []Filter) (string, []interface{}, error) {
 	for _, filter := range filters {
 		converter, ok := registryAssetFilterConverters[filter.Key]
 		if !ok {
-			return "", nil, apierrors.APIError{Code: 400, WrappedError: errors.New("attribute may not be filtered on")}
+			return "", nil, apierror.APIError{Code: 400, WrappedError: errors.New("attribute may not be filtered on")}
 		}
 		converted, err := converter(filter)
 		if err != nil {
-			return "", nil, apierrors.APIError{Code: 400, WrappedError: err}
+			return "", nil, apierror.APIError{Code: 400, WrappedError: err}
 		}
 		queryFragments = append(queryFragments, converted)
 		args = append(args, filter.Value)
@@ -73,7 +73,7 @@ func DBReadRegistryAsset(ctx context.Context, db *sql.DB, id int, organizationId
 		return models.RegistryAsset{}, err
 	}
 	if len(assets) == 0 {
-		return models.RegistryAsset{}, apierrors.APIError{Code: 404, WrappedError: errors.New("asset not found")}
+		return models.RegistryAsset{}, apierror.APIError{Code: 404, WrappedError: errors.New("asset not found")}
 	}
 	return assets[0], nil
 }
@@ -113,7 +113,7 @@ func DBDeleteRegistryAsset(ctx context.Context, db *sql.DB, id int, organization
 		return err
 	}
 	if rows == 0 {
-		return apierrors.APIError{Code: 404, WrappedError: errors.New("asset not found")}
+		return apierror.APIError{Code: 404, WrappedError: errors.New("asset not found")}
 	}
 	return nil
 }
@@ -141,11 +141,11 @@ func DBRegistryReportScopeFilter(filters []Filter) (string, []interface{}, error
 	for _, filter := range filters {
 		converter, ok := registryReportScopeFilterConverters[filter.Key]
 		if !ok {
-			return "", nil, apierrors.APIError{Code: 400, WrappedError: errors.New("attribute may not be filtered on")}
+			return "", nil, apierror.APIError{Code: 400, WrappedError: errors.New("attribute may not be filtered on")}
 		}
 		converted, err := converter(filter)
 		if err != nil {
-			return "", nil, apierrors.APIError{Code: 400, WrappedError: err}
+			return "", nil, apierror.APIError{Code: 400, WrappedError: err}
 		}
 		queryFragments = append(queryFragments, converted)
 		args = append(args, filter.Value)
@@ -176,7 +176,7 @@ func DBReadReportScope(ctx context.Context, db *sql.DB, id int, organizationId i
 		return models.RegistryReportScope{}, err
 	}
 	if len(scopes) == 0 {
-		return models.RegistryReportScope{}, apierrors.APIError{Code: 404, WrappedError: errors.New("scope not found")}
+		return models.RegistryReportScope{}, apierror.APIError{Code: 404, WrappedError: errors.New("scope not found")}
 	}
 	return scopes[0], nil
 }
@@ -225,7 +225,7 @@ func DBDeleteReportScope(ctx context.Context, db *sql.DB, id int, organizationId
 		return err
 	}
 	if rows == 0 {
-		return apierrors.APIError{Code: 404, WrappedError: errors.New("scope not found")}
+		return apierror.APIError{Code: 404, WrappedError: errors.New("scope not found")}
 	}
 	return nil
 }
